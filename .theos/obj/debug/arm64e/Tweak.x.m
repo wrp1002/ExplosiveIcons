@@ -26,6 +26,11 @@
 
 
 bool enabled;
+int colorCount = 30;
+int ballSize = 10;
+int amount = 100;
+float fadeTime = 1.5f;
+float bounce = 0.7;
 
 
 
@@ -108,10 +113,12 @@ static MRYIPCCenter* center;
 
 @implementation ExplosionParticleView
 	-(id)initAtPos:(CGPoint)pos {
-		id obj = [super initWithFrame:CGRectMake(pos.x - 10, pos.y - 10, 20, 20)];
-		self.layer.cornerRadius = 10;
+		id obj = [super initWithFrame:CGRectMake(pos.x - ballSize / 2, pos.y - ballSize / 2, ballSize, ballSize)];
+		self.layer.cornerRadius = 5;
 
-		[UIView animateWithDuration:2.0f
+		float life = 0.5 + fadeTime * drand48();
+
+		[UIView animateWithDuration:life
 			delay:0.0f
 			options:UIViewAnimationOptionCurveLinear
 			animations:^{
@@ -127,6 +134,50 @@ static MRYIPCCenter* center;
 		return obj;
 	}
 @end
+
+NSArray* getRGBAsFromImage(UIImage* image, int count) {
+    NSMutableArray *result = [NSMutableArray arrayWithCapacity:count];
+
+    
+    CGImageRef imageRef = [image CGImage];
+    unsigned long width = CGImageGetWidth(imageRef);
+    unsigned long height = CGImageGetHeight(imageRef);
+
+	unsigned long size = width * height;
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    unsigned char *rawData = (unsigned char*) calloc(height * width * 4, sizeof(unsigned char));
+    NSUInteger bytesPerPixel = 4;
+    NSUInteger bytesPerRow = bytesPerPixel * width;
+    NSUInteger bitsPerComponent = 8;
+    CGContextRef context = CGBitmapContextCreate(rawData, width, height,
+                    bitsPerComponent, bytesPerRow, colorSpace,
+                    kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(colorSpace);
+
+    CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef);
+    CGContextRelease(context);
+
+    
+    for (int i = 0 ; i < count ; i++) {
+		unsigned long byteIndex = arc4random_uniform(size / 4) * 4;
+
+        CGFloat alpha = 1.0f;
+        CGFloat red   = ((CGFloat) rawData[byteIndex]     ) / 255.0f;
+        CGFloat green = ((CGFloat) rawData[byteIndex + 1] ) / 255.0f;
+        CGFloat blue  = ((CGFloat) rawData[byteIndex + 2] ) / 255.0f;
+
+        UIColor *acolor = [UIColor colorWithRed:red green:green blue:blue alpha:alpha];
+        [result addObject:acolor];
+    }
+
+  free(rawData);
+
+	for (UIColor *color in result)
+		[Debug Log:[NSString stringWithFormat:@"results: %@", color]];
+
+  return result;
+}
 
 
 
@@ -155,7 +206,7 @@ static MRYIPCCenter* center;
 @class SpringBoard; @class SBIconView; @class SBIconListView; 
 
 static __inline__ __attribute__((always_inline)) __attribute__((unused)) Class _logos_static_class_lookup$SBIconView(void) { static Class _klass; if(!_klass) { _klass = objc_getClass("SBIconView"); } return _klass; }
-#line 133 "Tweak.x"
+#line 184 "Tweak.x"
 static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$)(_LOGOS_SELF_TYPE_INIT SBIconListView*, SEL, id, id, id, long long, id) _LOGOS_RETURN_RETAINED; static SBIconListView* _logos_method$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$(_LOGOS_SELF_TYPE_INIT SBIconListView*, SEL, id, id, id, long long, id) _LOGOS_RETURN_RETAINED; static void (*_logos_orig$DelayedHooks$SBIconListView$iconList$didRemoveIcon$)(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST, SEL, id, id); static void _logos_method$DelayedHooks$SBIconListView$iconList$didRemoveIcon$(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST, SEL, id, id); 
 	
 		__attribute__((used)) static UIDynamicAnimator * _logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator(SBIconListView * __unused self, SEL __unused _cmd) { return (UIDynamicAnimator *)objc_getAssociatedObject(self, (void *)_logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator); }; __attribute__((used)) static void _logos_method$DelayedHooks$SBIconListView$setExplosiveIcons_DynamicAnimator(SBIconListView * __unused self, SEL __unused _cmd, UIDynamicAnimator * rawValue) { objc_setAssociatedObject(self, (void *)_logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator, rawValue, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
@@ -219,8 +270,8 @@ static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$l
 						pos.y += iconView.frame.size.height / 2;
 
 						[Debug Log:[NSString stringWithFormat:@"X:%f  Y:%f", pos.x, pos.y]];
-						
-						
+
+						NSArray *colors = getRGBAsFromImage(image, colorCount);
 
 
 						self.ExplosiveIcons_DynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:self];
@@ -233,24 +284,29 @@ static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$l
 						self.ExplosiveIcons_CollisionBehavior.collisionMode = UICollisionBehaviorModeEverything;
 
 						self.ExplosiveIcons_UIDynamicItemBehavior = [[UIDynamicItemBehavior alloc] initWithItems:@[]];
-						self.ExplosiveIcons_UIDynamicItemBehavior.elasticity = 0.7;
+						self.ExplosiveIcons_UIDynamicItemBehavior.elasticity = bounce;
 
-						for (int i = 0; i < 10; i++) {
+						for (int i = 0; i < amount; i++) {
 							ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:pos];
-							newView.backgroundColor = [UIColor redColor];
+							UIColor *color = colors[arc4random_uniform([colors count] - 1)];
+							[Debug Log:[NSString stringWithFormat:@"COlor: %@", color]];
+							newView.backgroundColor = color;
 							[self addSubview:newView];
+
 							[self.ExplosiveIcons_GravityBehavior addItem:newView];
 							[self.ExplosiveIcons_CollisionBehavior addItem:newView];
 							[self.ExplosiveIcons_UIDynamicItemBehavior addItem:newView];
+
+							UIPushBehavior *pushBehavior = [[UIPushBehavior alloc] initWithItems:@[newView] mode:UIPushBehaviorModeInstantaneous];
+							pushBehavior.angle = M_PI * 2 * drand48();
+							pushBehavior.magnitude = 0.25 * drand48();
+							[self.ExplosiveIcons_DynamicAnimator addBehavior:pushBehavior];
 						}
 						
 
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_GravityBehavior];
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_CollisionBehavior];
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_UIDynamicItemBehavior];
-
-						for (UIView *item in self.ExplosiveIcons_UIDynamicItemBehavior.items) {
-							[self.ExplosiveIcons_UIDynamicItemBehavior addLinearVelocity:CGPointMake(20, 0) forItem:item];						}
 					}
 				}
 				else {
@@ -278,7 +334,9 @@ static void (*_logos_orig$Hooks$SpringBoard$applicationDidFinishLaunching$)(_LOG
 
 
 
-static __attribute__((constructor)) void _logosLocalCtor_2b58030d(int __unused argc, char __unused **argv, char __unused **envp) {
+static __attribute__((constructor)) void _logosLocalCtor_5c40de68(int __unused argc, char __unused **argv, char __unused **envp) {
+	srand48(time(0));
+
 	[Debug Log:[NSString stringWithFormat:@"============== %@ started ==============", TWEAK_NAME]];
 
 	preferences = [[HBPreferences alloc] initWithIdentifier:BUNDLE];
