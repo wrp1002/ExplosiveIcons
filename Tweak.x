@@ -11,7 +11,15 @@
 - (void)_setSecure:(BOOL)arg1;
 @end
 
-@class ExplosiveIcons;
+@interface SBIconListView : UIView
+	@property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
+	@property (nonatomic, retain)UIGravityBehavior *ExplosiveIcons_GravityBehavior;
+	@property (nonatomic, retain)UICollisionBehavior *ExplosiveIcons_CollisionBehavior;
+	@property (nonatomic, retain)UIDynamicItemBehavior *ExplosiveIcons_UIDynamicItemBehavior;
+@end
+
+@interface UIDynamicItem
+@end
 
 
 //	=========================== Preference vars ===========================
@@ -23,7 +31,6 @@ bool enabled;
 int startupDelay = 5;
 HBPreferences *preferences;
 static MRYIPCCenter* center;
-ExplosiveIcons *explosiveIcons;
 
 //	=========================== Debugging stuff ===========================
 
@@ -101,8 +108,9 @@ ExplosiveIcons *explosiveIcons;
 @implementation ExplosionParticleView
 	-(id)initAtPos:(CGPoint)pos {
 		id obj = [super initWithFrame:CGRectMake(pos.x - 10, pos.y - 10, 20, 20)];
+		self.layer.cornerRadius = 10;
 
-		[UIView animateWithDuration:1.0f
+		[UIView animateWithDuration:2.0f
 			delay:0.0f
 			options:UIViewAnimationOptionCurveLinear
 			animations:^{
@@ -119,67 +127,26 @@ ExplosiveIcons *explosiveIcons;
 	}
 @end
 
-@interface ExplosiveIcons : NSObject { }
-@property (nonatomic, retain) UIWindow *springboardWindow;
-@end
-
-@implementation ExplosiveIcons
-	- (id)init {
-		[Debug Log:@"ExplosiveIcons init()"];
-		if (self = [super init]) {
-			_springboardWindow = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-			_springboardWindow.windowLevel = UIWindowLevelAlert;
-			[_springboardWindow setHidden:NO];
-			[_springboardWindow _setSecure:YES];
-			[_springboardWindow setUserInteractionEnabled:NO];
-			_springboardWindow.backgroundColor = [UIColor clearColor];
-			//[_springboardWindow makeKeyAndVisible];
-			
-			
-		}
-		return self;
-	}
-
-	-(void)addParticleWithColor:(UIColor *)color at:(CGPoint)pos {
-		ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:pos];
-		newView.backgroundColor = color;
-		[_springboardWindow addSubview:newView];
-	}
-@end
-
 
 //	=========================== Hooks ===========================
 
-%group Hooks
-
-	%hook SpringBoard
-
-		//	Called when springboard is finished launching
-		-(void)applicationDidFinishLaunching:(id)application {
-			%orig;
-			[Debug SpringBoardReady];
-			explosiveIcons = [[ExplosiveIcons alloc] init];
-		}
-
-	%end
-		
-		/*
-	%hook SBIcon
-		- (void)setUninstalled {
-			%orig;
-			[Debug Log:[NSString stringWithFormat:@"setUninstalled: %@", [self displayName]]];
-		}
-		- (void)completeUninstall {
-			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2.0f * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-				%orig;
-			});
-			[Debug Log:[NSString stringWithFormat:@"completeUninstall: %@", [self displayName]]];
-		}
-	%end
-
-	*/
-
+%group DelayedHooks
 	%hook SBIconListView
+		%property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
+		%property (nonatomic, retain)UIGravityBehavior *ExplosiveIcons_GravityBehavior;
+		%property (nonatomic, retain)UICollisionBehavior *ExplosiveIcons_CollisionBehavior;
+		%property (nonatomic, retain)UIDynamicItemBehavior *ExplosiveIcons_UIDynamicItemBehavior;
+
+		-(id)initWithModel:(id)arg1 layoutProvider:(id)arg2 iconLocation:(id)arg3 orientation:(long long)arg4 iconViewProvider:(id)arg5 {
+			id obj = %orig;
+
+			[Debug Log:@"SBIconListView init()"];
+
+			
+
+			return obj;
+		}
+
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
 			%orig;
 
@@ -210,24 +177,54 @@ ExplosiveIcons *explosiveIcons;
 					if ([checkID isEqualToString:bundleID]) {
 						[Debug Log:[NSString stringWithFormat:@"Uninstalled: %@", bundleID]];
 
-						// do this
 						SBIconImageView *iconImage = [iconView _iconImageView];
 						UIImage *image = [iconImage displayedImage];
 						UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
 
 						//CGFloat x = iconView.frame.origin.x + iconView.frame.size.width / 2;
 						//CGFloat y = iconView.frame.origin.y + iconView.frame.size.height / 2;
-
 						//CGPoint pos = [self convertPoint:iconView.frame.origin toView:[explosiveIcons springboardWindow]];
-						CGPoint pos = [self convertPoint:iconView.frame.origin toView:self];
-						pos.x += iconView.frame.size.width / 2;
+
+						//	Position of the deleted icon
+						CGPoint pos = iconView.frame.origin;
+
+						//	Move point to center of icon
+						pos.x += iconView.frame.size.width / 2; 
 						pos.y += iconView.frame.size.height / 2;
 
 						[Debug Log:[NSString stringWithFormat:@"X:%f  Y:%f", pos.x, pos.y]];
 						//[explosiveIcons addParticleWithColor:[UIColor redColor] at:pos];
-						ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:pos];
-						newView.backgroundColor = [UIColor redColor];
-						[self addSubview:newView];
+						
+
+
+						self.ExplosiveIcons_DynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:self];
+
+						self.ExplosiveIcons_GravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[]];
+						self.ExplosiveIcons_GravityBehavior.gravityDirection = CGVectorMake(0, 5);
+
+						self.ExplosiveIcons_CollisionBehavior = [[UICollisionBehavior alloc] initWithItems:@[]];
+						self.ExplosiveIcons_CollisionBehavior.translatesReferenceBoundsIntoBoundary = YES;
+						self.ExplosiveIcons_CollisionBehavior.collisionMode = UICollisionBehaviorModeEverything;
+
+						self.ExplosiveIcons_UIDynamicItemBehavior = [[UIDynamicItemBehavior alloc] initWithItems:@[]];
+						self.ExplosiveIcons_UIDynamicItemBehavior.elasticity = 0.7;
+
+						for (int i = 0; i < 10; i++) {
+							ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:pos];
+							newView.backgroundColor = [UIColor redColor];
+							[self addSubview:newView];
+							[self.ExplosiveIcons_GravityBehavior addItem:newView];
+							[self.ExplosiveIcons_CollisionBehavior addItem:newView];
+							[self.ExplosiveIcons_UIDynamicItemBehavior addItem:newView];
+						}
+						
+
+						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_GravityBehavior];
+						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_CollisionBehavior];
+						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_UIDynamicItemBehavior];
+
+						for (UIView *item in self.ExplosiveIcons_UIDynamicItemBehavior.items) {
+							[self.ExplosiveIcons_UIDynamicItemBehavior addLinearVelocity:CGPointMake(20, 0) forItem:item];						}
 					}
 				}
 				else {
@@ -237,68 +234,19 @@ ExplosiveIcons *explosiveIcons;
 			}
 		}
 	%end
-
-	/*
-	%hook SBApplicationController
-		-(void)uninstallApplication:(id)arg1 {
-			[Debug Log:[NSString stringWithFormat:@"uninstallApplication: arg1:%@", arg1]];
-
-			@try {
-				SBApplication *app = arg1;
-				NSString *bundleID = [app bundleIdentifier];
-				[Debug Log:[NSString stringWithFormat:@"uninstallApplication  bundleID:%@", bundleID]];
-				lastDeletedID = bundleID;
-			}
-			@catch (NSException *e) {
-				[Debug LogException:e];
-			}
-
-			%orig;
-		}
-	%end*/
-
-
-	/*%hook SBIconView
-	 	- (void)prepareForReuse {
-			[Debug Log:@"- (void)prepareForReuse;"];
-
-			@try {
-				SBIcon *icon = [self icon];
-				NSString *bundleID = [icon applicationBundleID];
-
-				[Debug Log:[NSString stringWithFormat:@"bundleID:%@   lastDeletedID:%@", bundleID, lastDeletedID]];
-
-				if ([bundleID isEqualToString:lastDeletedID]) {
-					[Debug Log:@"Uninstalled"];
-					SBIconImageView *iconImage = [self _iconImageView];
-					UIImage *image = [iconImage displayedImage];
-
-					UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
-
-					CGFloat x = self.frame.origin.x + self.frame.size.width / 2;
-					CGFloat y = self.frame.origin.y + self.frame.size.height / 2;
-
-					CGPoint pos = [self convertPoint:self.frame.origin toView:[explosiveIcons springboardWindow]];
-
-					[Debug Log:[NSString stringWithFormat:@"X:%f  Y:%f", pos.x, pos.y]];
-					[explosiveIcons addColor:[UIColor redColor] atX:x atY:y];
-				}
-			}
-			@catch (NSException *e) {
-				[Debug LogException:e];
-			}
-
-			%orig;
-		 }
-	%end*/
-
-
 %end
 
 
+%group Hooks
+	%hook SpringBoard
+		//	Called when springboard is finished launching
+		-(void)applicationDidFinishLaunching:(id)application {
+			%orig;
+			[Debug SpringBoardReady];
+			%init(DelayedHooks);
+		}
 
-%group DelayedHooks
-
+	%end
 %end
 
 
@@ -315,8 +263,4 @@ ExplosiveIcons *explosiveIcons;
 	if ([bundleID isEqualToString:@"com.apple.springboard"]) {}
 
 	%init(Hooks);
-
-	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, startupDelay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-		%init(DelayedHooks);
-	});
 }

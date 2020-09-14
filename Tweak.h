@@ -25,6 +25,3 @@
 @interface SBApplicationIcon : SBLeafIcon
 	-(id)application;
 @end
-
-@interface SBIconListView : UIView
-@end
