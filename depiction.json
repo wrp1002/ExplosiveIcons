@@ -1,11 +1,11 @@
 {
 	"title": "ExplosiveIcons",
-	"description": "Make icons explode when they're deleted! Plenty of options for customization included. <br><br><b>Warning: </b>This tweak is under development and may or may not have proper functionality. Install at your own risk. If you have any problems or ideas for the tweak, feel free to contact me!",
+	"description": "Make icons explode when they're deleted! Plenty of options for customization included in preferences.",
 	"compatibility": "Made for iOS 13",
 	"screenshots": ["screenshot1.gif", "screenshot2.png"],
 	"changelog": [
 		{
-			"version": "1.0.0 (Not yet)",
+			"version": "1.0.0",
 			"changes": ["Initial Release"]
 		}
 	]
