@@ -98,13 +98,13 @@
 			<key>min</key>
 			<integer>50</integer>
 			<key>max</key>
-			<integer>200</integer>
+			<integer>150</integer>
 			<key>showValue</key>
 			<true/>
 			<key>isSegmented</key>
 			<true/>
 			<key>segmentCount</key>
-			<integer>3</integer>
+			<integer>4</integer>
 			<key>default</key>
 			<integer>100</integer>
 			<key>defaults</key>

@@ -25,3 +25,12 @@
 @interface SBApplicationIcon : SBLeafIcon
 	-(id)application;
 @end
+
+@interface UIWindow ()
+- (void)_setSecure:(BOOL)arg1;
+@end
+
+@interface SBIconListView : UIView
+	@property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
+	-(BOOL)isEditing;
+@end

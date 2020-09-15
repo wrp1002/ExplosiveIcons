@@ -8,19 +8,6 @@
 #define BUNDLE [NSString stringWithFormat:@"com.wrp1002.%@", [TWEAK_NAME lowercaseString]]
 
 
-@interface UIWindow ()
-- (void)_setSecure:(BOOL)arg1;
-@end
-
-@interface SBIconListView : UIView
-	@property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
-@end
-
-@interface UIDynamicItem
-@end
-
-
-
 
 bool enabled;
 bool gravity;
@@ -199,23 +186,13 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 #define _LOGOS_RETURN_RETAINED
 #endif
 
-@class SBIconListView; @class SpringBoard; @class SBIconView; 
+@class SBIconView; @class SpringBoard; @class SBIconListView; 
 
 static __inline__ __attribute__((always_inline)) __attribute__((unused)) Class _logos_static_class_lookup$SBIconView(void) { static Class _klass; if(!_klass) { _klass = objc_getClass("SBIconView"); } return _klass; }
-#line 180 "Tweak.x"
-static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$)(_LOGOS_SELF_TYPE_INIT SBIconListView*, SEL, id, id, id, long long, id) _LOGOS_RETURN_RETAINED; static SBIconListView* _logos_method$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$(_LOGOS_SELF_TYPE_INIT SBIconListView*, SEL, id, id, id, long long, id) _LOGOS_RETURN_RETAINED; static void (*_logos_orig$DelayedHooks$SBIconListView$iconList$didRemoveIcon$)(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST, SEL, id, id); static void _logos_method$DelayedHooks$SBIconListView$iconList$didRemoveIcon$(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST, SEL, id, id); 
+#line 167 "Tweak.x"
+static void (*_logos_orig$DelayedHooks$SBIconListView$iconList$didRemoveIcon$)(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST, SEL, id, id); static void _logos_method$DelayedHooks$SBIconListView$iconList$didRemoveIcon$(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST, SEL, id, id); 
 	
 		__attribute__((used)) static UIDynamicAnimator * _logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator(SBIconListView * __unused self, SEL __unused _cmd) { return (UIDynamicAnimator *)objc_getAssociatedObject(self, (void *)_logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator); }; __attribute__((used)) static void _logos_method$DelayedHooks$SBIconListView$setExplosiveIcons_DynamicAnimator(SBIconListView * __unused self, SEL __unused _cmd, UIDynamicAnimator * rawValue) { objc_setAssociatedObject(self, (void *)_logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator, rawValue, OBJC_ASSOCIATION_RETAIN_NONATOMIC); }
-
-		static SBIconListView* _logos_method$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$(_LOGOS_SELF_TYPE_INIT SBIconListView* __unused self, SEL __unused _cmd, id arg1, id arg2, id arg3, long long arg4, id arg5) _LOGOS_RETURN_RETAINED {
-			id obj = _logos_orig$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$(self, _cmd, arg1, arg2, arg3, arg4, arg5);
-
-			[Debug Log:@"SBIconListView init()"];
-
-			
-
-			return obj;
-		}
 
 		static void _logos_method$DelayedHooks$SBIconListView$iconList$didRemoveIcon$(_LOGOS_SELF_TYPE_NORMAL SBIconListView* _LOGOS_SELF_CONST __unused self, SEL __unused _cmd, id arg1, id arg2) {
 			_logos_orig$DelayedHooks$SBIconListView$iconList$didRemoveIcon$(self, _cmd, arg1, arg2);
@@ -237,6 +214,16 @@ static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$l
 
 			
 			NSArray *subviews = [self subviews];
+
+			
+			
+			if ([subviews count] <= 1) {
+				bool editing = [self isEditing];
+
+				if (!editing)
+					return;
+			}
+			
 
 			for (id view in subviews) {
 				
@@ -293,9 +280,8 @@ static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$l
 
 							
 							UIColor *color;
-							if (randomColors) {
+							if (randomColors)
 								color = [UIColor colorWithRed:drand48() green:drand48() blue:drand48() alpha:1.0f];
-							}
 							else 
 								color = colors[arc4random_uniform([colors count] - 1)];
 
@@ -318,6 +304,8 @@ static SBIconListView* (*_logos_orig$DelayedHooks$SBIconListView$initWithModel$l
 						if (gravity) [self.ExplosiveIcons_DynamicAnimator addBehavior:gravityBehavior];
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:collisionBehavior];
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:dynamicItemBehavior];
+
+						break;
 					}
 				}
 				else {
@@ -338,7 +326,7 @@ static void (*_logos_orig$Hooks$SpringBoard$applicationDidFinishLaunching$)(_LOG
 			[Debug SpringBoardReady];
 
 			
-			{Class _logos_class$DelayedHooks$SBIconListView = objc_getClass("SBIconListView"); { MSHookMessageEx(_logos_class$DelayedHooks$SBIconListView, @selector(initWithModel:layoutProvider:iconLocation:orientation:iconViewProvider:), (IMP)&_logos_method$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$, (IMP*)&_logos_orig$DelayedHooks$SBIconListView$initWithModel$layoutProvider$iconLocation$orientation$iconViewProvider$);}{ MSHookMessageEx(_logos_class$DelayedHooks$SBIconListView, @selector(iconList:didRemoveIcon:), (IMP)&_logos_method$DelayedHooks$SBIconListView$iconList$didRemoveIcon$, (IMP*)&_logos_orig$DelayedHooks$SBIconListView$iconList$didRemoveIcon$);}{ char _typeEncoding[1024]; sprintf(_typeEncoding, "%s@:", @encode(UIDynamicAnimator *)); class_addMethod(_logos_class$DelayedHooks$SBIconListView, @selector(ExplosiveIcons_DynamicAnimator), (IMP)&_logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator, _typeEncoding); sprintf(_typeEncoding, "v@:%s", @encode(UIDynamicAnimator *)); class_addMethod(_logos_class$DelayedHooks$SBIconListView, @selector(setExplosiveIcons_DynamicAnimator:), (IMP)&_logos_method$DelayedHooks$SBIconListView$setExplosiveIcons_DynamicAnimator, _typeEncoding); } }
+			{Class _logos_class$DelayedHooks$SBIconListView = objc_getClass("SBIconListView"); { MSHookMessageEx(_logos_class$DelayedHooks$SBIconListView, @selector(iconList:didRemoveIcon:), (IMP)&_logos_method$DelayedHooks$SBIconListView$iconList$didRemoveIcon$, (IMP*)&_logos_orig$DelayedHooks$SBIconListView$iconList$didRemoveIcon$);}{ char _typeEncoding[1024]; sprintf(_typeEncoding, "%s@:", @encode(UIDynamicAnimator *)); class_addMethod(_logos_class$DelayedHooks$SBIconListView, @selector(ExplosiveIcons_DynamicAnimator), (IMP)&_logos_method$DelayedHooks$SBIconListView$ExplosiveIcons_DynamicAnimator, _typeEncoding); sprintf(_typeEncoding, "v@:%s", @encode(UIDynamicAnimator *)); class_addMethod(_logos_class$DelayedHooks$SBIconListView, @selector(setExplosiveIcons_DynamicAnimator:), (IMP)&_logos_method$DelayedHooks$SBIconListView$setExplosiveIcons_DynamicAnimator, _typeEncoding); } }
 		}
 
 	
@@ -347,7 +335,7 @@ static void (*_logos_orig$Hooks$SpringBoard$applicationDidFinishLaunching$)(_LOG
 
 
 
-static __attribute__((constructor)) void _logosLocalCtor_c97e8588(int __unused argc, char __unused **argv, char __unused **envp) {
+static __attribute__((constructor)) void _logosLocalCtor_663fc3d2(int __unused argc, char __unused **argv, char __unused **envp) {
 	srand48(time(0));
 
 	[Debug Log:[NSString stringWithFormat:@"============== %@ started ==============", TWEAK_NAME]];

@@ -6,19 +6,6 @@
 #define TWEAK_NAME @"ExplosiveIcons"
 #define BUNDLE [NSString stringWithFormat:@"com.wrp1002.%@", [TWEAK_NAME lowercaseString]]
 
-
-@interface UIWindow ()
-- (void)_setSecure:(BOOL)arg1;
-@end
-
-@interface SBIconListView : UIView
-	@property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
-@end
-
-@interface UIDynamicItem
-@end
-
-
 //	=========================== Preference vars ===========================
 
 bool enabled;
@@ -181,16 +168,6 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 	%hook SBIconListView
 		%property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
 
-		-(id)initWithModel:(id)arg1 layoutProvider:(id)arg2 iconLocation:(id)arg3 orientation:(long long)arg4 iconViewProvider:(id)arg5 {
-			id obj = %orig;
-
-			[Debug Log:@"SBIconListView init()"];
-
-			
-
-			return obj;
-		}
-
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
 			%orig;
 
@@ -209,8 +186,18 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 			[Debug Log:[NSString stringWithFormat:@"bundleID:%@", bundleID]];
 
-			// Get the subviews of the view (all icons on screen)
+			// Get the subviews of the SBIconListView (all icons on screen)
 			NSArray *subviews = [self subviews];
+
+			//	If an icon is deleted, it's the only icon on screen, and editing mode isn't enabled, 
+			//	then there's no point in doing the animation because the page instantly disapears
+			if ([subviews count] <= 1) {
+				bool editing = [self isEditing];
+
+				if (!editing)
+					return;
+			}
+			
 
 			for (id view in subviews) {
 				//	Make sure the view is actually an icon. I think it always is anyway tho
@@ -243,7 +230,7 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 						if (!randomColors)
 							colors = getColorsFromImage(image, colorCount);
 
-						// Physics stuff be here
+						// Physics stuff start here
 						self.ExplosiveIcons_DynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:self];
 
 						UIGravityBehavior *gravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[]];
@@ -267,9 +254,8 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 							//	Figure out color for new particle
 							UIColor *color;
-							if (randomColors) {
+							if (randomColors)
 								color = [UIColor colorWithRed:drand48() green:drand48() blue:drand48() alpha:1.0f];
-							}
 							else 
 								color = colors[arc4random_uniform([colors count] - 1)];
 
@@ -292,6 +278,8 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 						if (gravity) [self.ExplosiveIcons_DynamicAnimator addBehavior:gravityBehavior];
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:collisionBehavior];
 						[self.ExplosiveIcons_DynamicAnimator addBehavior:dynamicItemBehavior];
+
+						break;
 					}
 				}
 				else {
@@ -311,7 +299,7 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 			%orig;
 			[Debug SpringBoardReady];
 
-			//	Lots of icons are added and removed as SpringBoard starts up, so wait till its finished to init icon hooks
+			//	Lots of icons are added and removed as SpringBoard starts up, so wait till its finished to init SBIconListView hooks
 			%init(DelayedHooks);
 		}
 
