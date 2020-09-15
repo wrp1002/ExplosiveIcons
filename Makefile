@@ -18,3 +18,5 @@ $(TWEAK_NAME)_EXTRA_FRAMEWORKS += Cephei
 
 include $(THEOS)/makefiles/common.mk
 include $(THEOS_MAKE_PATH)/tweak.mk
+SUBPROJECTS += explosiveiconsprefs
+include $(THEOS_MAKE_PATH)/aggregate.mk

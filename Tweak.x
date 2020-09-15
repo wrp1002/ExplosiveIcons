@@ -4,7 +4,7 @@
 #include "Tweak.h"
 
 #define TWEAK_NAME @"ExplosiveIcons"
-#define BUNDLE [NSString stringWithFormat:@"com.wrp1002.%@", TWEAK_NAME]
+#define BUNDLE [NSString stringWithFormat:@"com.wrp1002.%@", [TWEAK_NAME lowercaseString]]
 
 
 @interface UIWindow ()
@@ -13,9 +13,6 @@
 
 @interface SBIconListView : UIView
 	@property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
-	@property (nonatomic, retain)UIGravityBehavior *ExplosiveIcons_GravityBehavior;
-	@property (nonatomic, retain)UICollisionBehavior *ExplosiveIcons_CollisionBehavior;
-	@property (nonatomic, retain)UIDynamicItemBehavior *ExplosiveIcons_UIDynamicItemBehavior;
 @end
 
 @interface UIDynamicItem
@@ -25,11 +22,14 @@
 //	=========================== Preference vars ===========================
 
 bool enabled;
-int colorCount = 30;
-int ballSize = 10;
-int amount = 100;
-float fadeTime = 1.5f;
-float bounce = 0.7;
+bool gravity;
+bool randomColors;
+NSInteger colorCount = 30;
+NSInteger ballSize = 15;
+NSInteger amount = 100;
+CGFloat fadeTime = 1.5f;
+CGFloat bounce = 0.8;
+CGFloat explosionForce = 0.05;
 
 //	=========================== Other vars ===========================
 
@@ -106,27 +106,29 @@ static MRYIPCCenter* center;
 
 //	=========================== Classes / Functions ===========================
 
+//	Custom view that acts as explosion particle
 @interface ExplosionParticleView : UIView
 	-(id)initAtPos:(CGPoint)pos;
 @end
 
 @implementation ExplosionParticleView
 	-(id)initAtPos:(CGPoint)pos {
-		id obj = [super initWithFrame:CGRectMake(pos.x - ballSize / 2, pos.y - ballSize / 2, ballSize, ballSize)];
-		self.layer.cornerRadius = 5;
-
+		//	Give particle sizes a bit of randomness
+		int size = ballSize * drand48() + 1;
 		float life = 0.5 + fadeTime * drand48();
 
-		[UIView animateWithDuration:life
-			delay:0.0f
+		id obj = [super initWithFrame:CGRectMake(pos.x - size / 2, pos.y - size / 2, size, size)];
+		self.layer.cornerRadius = size / 2;
+
+		[UIView animateWithDuration:life / 2
+			delay:life / 2
 			options:UIViewAnimationOptionCurveLinear
 			animations:^{
-				//	First part of animation
 				self.alpha = 0.0;
 
 			} completion:^(BOOL finished) {
+				//	Remove the particle view when its faded out
 				[super removeFromSuperview];
-				[Debug Log:@"Done"];
 			}
 		];
 
@@ -134,10 +136,9 @@ static MRYIPCCenter* center;
 	}
 @end
 
-NSArray* getRGBAsFromImage(UIImage* image, int count) {
+NSArray* getColorsFromImage(UIImage* image, int count) {
     NSMutableArray *result = [NSMutableArray arrayWithCapacity:count];
 
-    // First get the image into your data buffer
     CGImageRef imageRef = [image CGImage];
     unsigned long width = CGImageGetWidth(imageRef);
     unsigned long height = CGImageGetHeight(imageRef);
@@ -150,14 +151,13 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
     NSUInteger bytesPerRow = bytesPerPixel * width;
     NSUInteger bitsPerComponent = 8;
     CGContextRef context = CGBitmapContextCreate(rawData, width, height,
-                    bitsPerComponent, bytesPerRow, colorSpace,
-                    kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+													bitsPerComponent, bytesPerRow, colorSpace,
+													kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
     CGColorSpaceRelease(colorSpace);
 
     CGContextDrawImage(context, CGRectMake(0, 0, width, height), imageRef);
     CGContextRelease(context);
 
-    // Now your rawData contains the image data in the RGBA8888 pixel format.
     for (int i = 0 ; i < count ; i++) {
 		unsigned long byteIndex = arc4random_uniform(size / 4) * 4;
 
@@ -171,10 +171,6 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
     }
 
   free(rawData);
-
-	for (UIColor *color in result)
-		[Debug Log:[NSString stringWithFormat:@"results: %@", color]];
-
   return result;
 }
 
@@ -184,9 +180,6 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
 %group DelayedHooks
 	%hook SBIconListView
 		%property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
-		%property (nonatomic, retain)UIGravityBehavior *ExplosiveIcons_GravityBehavior;
-		%property (nonatomic, retain)UICollisionBehavior *ExplosiveIcons_CollisionBehavior;
-		%property (nonatomic, retain)UIDynamicItemBehavior *ExplosiveIcons_UIDynamicItemBehavior;
 
 		-(id)initWithModel:(id)arg1 layoutProvider:(id)arg2 iconLocation:(id)arg3 orientation:(long long)arg4 iconViewProvider:(id)arg5 {
 			id obj = %orig;
@@ -201,13 +194,14 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
 			%orig;
 
-			//[Debug Log:[NSString stringWithFormat:@"didRemoveIcon arg1:%@   arg2:%@", arg1, arg2]];
 			[Debug Log:[NSString stringWithFormat:@"didRemoveIcon"]];
 
+			//	Get icon info and bundleID
 			SBApplicationIcon *appIcon = arg2;
 			SBApplication *app = [appIcon application];
 			NSString *bundleID = [app bundleIdentifier];
 
+			//	bundleID is null if the icon is being moved, which is great
 			if (!bundleID) {
 				[Debug Log:[NSString stringWithFormat:@"No bundle ID"]];
 				return;
@@ -215,26 +209,25 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
 
 			[Debug Log:[NSString stringWithFormat:@"bundleID:%@", bundleID]];
 
-			// Get the subviews of the view
+			// Get the subviews of the view (all icons on screen)
 			NSArray *subviews = [self subviews];
 
 			for (id view in subviews) {
+				//	Make sure the view is actually an icon. I think it always is anyway tho
 				if ([view isMemberOfClass:[%c(SBIconView) class]]) {
 					SBIconView *iconView = view;
 
+					//	Check if this is the icon that was deleted
 					SBIcon *icon = [iconView icon];
 					NSString *checkID = [icon applicationBundleID];
 
 					if ([checkID isEqualToString:bundleID]) {
 						[Debug Log:[NSString stringWithFormat:@"Uninstalled: %@", bundleID]];
 
+						//	Get the icon's image
 						SBIconImageView *iconImage = [iconView _iconImageView];
 						UIImage *image = [iconImage displayedImage];
-						UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
-
-						//CGFloat x = iconView.frame.origin.x + iconView.frame.size.width / 2;
-						//CGFloat y = iconView.frame.origin.y + iconView.frame.size.height / 2;
-						//CGPoint pos = [self convertPoint:iconView.frame.origin toView:[explosiveIcons springboardWindow]];
+						//UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
 
 						//	Position of the deleted icon
 						CGPoint pos = iconView.frame.origin;
@@ -245,45 +238,64 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
 
 						[Debug Log:[NSString stringWithFormat:@"X:%f  Y:%f", pos.x, pos.y]];
 
-						NSArray *colors = getRGBAsFromImage(image, colorCount);
+						//	Only bother figuring out colors if random colors is turned off
+						NSArray *colors = @[];
+						if (!randomColors)
+							colors = getColorsFromImage(image, colorCount);
 
-
+						// Physics stuff be here
 						self.ExplosiveIcons_DynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:self];
 
-						self.ExplosiveIcons_GravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[]];
-						self.ExplosiveIcons_GravityBehavior.gravityDirection = CGVectorMake(0, 5);
+						UIGravityBehavior *gravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[]];
+						gravityBehavior.gravityDirection = CGVectorMake(0, 5);
 
-						self.ExplosiveIcons_CollisionBehavior = [[UICollisionBehavior alloc] initWithItems:@[]];
-						self.ExplosiveIcons_CollisionBehavior.translatesReferenceBoundsIntoBoundary = YES;
-						self.ExplosiveIcons_CollisionBehavior.collisionMode = UICollisionBehaviorModeEverything;
+						UICollisionBehavior *collisionBehavior = [[UICollisionBehavior alloc] initWithItems:@[]];
+						collisionBehavior.translatesReferenceBoundsIntoBoundary = YES;
+						collisionBehavior.collisionMode = UICollisionBehaviorModeEverything;
 
-						self.ExplosiveIcons_UIDynamicItemBehavior = [[UIDynamicItemBehavior alloc] initWithItems:@[]];
-						self.ExplosiveIcons_UIDynamicItemBehavior.elasticity = bounce;
+						UIDynamicItemBehavior *dynamicItemBehavior = [[UIDynamicItemBehavior alloc] initWithItems:@[]];
+						dynamicItemBehavior.elasticity = bounce;
 
+						//	Time to make particles
 						for (int i = 0; i < amount; i++) {
-							ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:pos];
-							UIColor *color = colors[arc4random_uniform([colors count] - 1)];
-							[Debug Log:[NSString stringWithFormat:@"COlor: %@", color]];
+							//	Add a bit of randomness to the position so that all points aren't stacked
+							CGPoint adjustedPos = pos;
+							adjustedPos.x += (1 - drand48() * 2);
+							adjustedPos.y += (1 - drand48() * 2);
+
+							ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:adjustedPos];
+
+							//	Figure out color for new particle
+							UIColor *color;
+							if (randomColors) {
+								color = [UIColor colorWithRed:drand48() green:drand48() blue:drand48() alpha:1.0f];
+							}
+							else 
+								color = colors[arc4random_uniform([colors count] - 1)];
+
 							newView.backgroundColor = color;
 							[self addSubview:newView];
 
-							[self.ExplosiveIcons_GravityBehavior addItem:newView];
-							[self.ExplosiveIcons_CollisionBehavior addItem:newView];
-							[self.ExplosiveIcons_UIDynamicItemBehavior addItem:newView];
+							//	Add behaviors to new view
+							[gravityBehavior addItem:newView];
+							[collisionBehavior addItem:newView];
+							[dynamicItemBehavior addItem:newView];
 
+							//	Push each particle in a random direction
 							UIPushBehavior *pushBehavior = [[UIPushBehavior alloc] initWithItems:@[newView] mode:UIPushBehaviorModeInstantaneous];
 							pushBehavior.angle = M_PI * 2 * drand48();
-							pushBehavior.magnitude = 0.25 * drand48();
+							pushBehavior.magnitude = explosionForce * drand48();
 							[self.ExplosiveIcons_DynamicAnimator addBehavior:pushBehavior];
 						}
 						
-
-						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_GravityBehavior];
-						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_CollisionBehavior];
-						[self.ExplosiveIcons_DynamicAnimator addBehavior:self.ExplosiveIcons_UIDynamicItemBehavior];
+						//	Add behaviors to DynamicAnimator
+						if (gravity) [self.ExplosiveIcons_DynamicAnimator addBehavior:gravityBehavior];
+						[self.ExplosiveIcons_DynamicAnimator addBehavior:collisionBehavior];
+						[self.ExplosiveIcons_DynamicAnimator addBehavior:dynamicItemBehavior];
 					}
 				}
 				else {
+					//	This prolly never happens
 					[Debug Log:[NSString stringWithFormat:@"Not SBIconView :("]];
 				}
 				
@@ -292,13 +304,14 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
 	%end
 %end
 
-
 %group Hooks
 	%hook SpringBoard
 		//	Called when springboard is finished launching
 		-(void)applicationDidFinishLaunching:(id)application {
 			%orig;
 			[Debug SpringBoardReady];
+
+			//	Lots of icons are added and removed as SpringBoard starts up, so wait till its finished to init icon hooks
 			%init(DelayedHooks);
 		}
 
@@ -313,12 +326,22 @@ NSArray* getRGBAsFromImage(UIImage* image, int count) {
 
 	[Debug Log:[NSString stringWithFormat:@"============== %@ started ==============", TWEAK_NAME]];
 
+
 	preferences = [[HBPreferences alloc] initWithIdentifier:BUNDLE];
 
 	[preferences registerBool:&enabled default:true forKey:@"kEnabled"];
+	[preferences registerBool:&gravity default:true forKey:@"kGravity"];
+	[preferences registerBool:&randomColors default:false forKey:@"kRandomColors"];
 
-	NSString *bundleID = NSBundle.mainBundle.bundleIdentifier;
-	if ([bundleID isEqualToString:@"com.apple.springboard"]) {}
+	[preferences registerInteger:&colorCount default:20 forKey:@"kColorCount"];
+	[preferences registerInteger:&ballSize default:15 forKey:@"kBallSize"];
+	[preferences registerInteger:&amount default:100 forKey:@"kAmount"];
+
+	[preferences registerFloat:&fadeTime default:1.5f forKey:@"kFadeTime"];
+	[preferences registerFloat:&bounce default:0.8f forKey:@"kBounce"];
+	[preferences registerFloat:&explosionForce default:0.05 forKey:@"kExplosionForce"];
 
 	%init(Hooks);
 }
+
+
