@@ -107,6 +107,12 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 //	=========================== Hooks ===========================
 
+@interface SBIconListView (Override)
+-(id)iconViewForIcon:(id)arg1;
+-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2;
+@end
+
+
 %group DelayedHooks
 	%hook SBIconListView
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
@@ -139,83 +145,82 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 					return;
 			}
 
+			id view = [self iconViewForIcon:appIcon];
+			if (!view)
+				return;
 
-			for (id view in subviews) {
-				//	Make sure the view is actually an icon. I think it always is anyway tho
-				if (![view isMemberOfClass:[%c(SBIconView) class]]) {
-					//	This prolly never happens
-					//[Debug Log:[NSString stringWithFormat:@"Not SBIconView :("]];
-					continue;
-				}
-
-				SBIconView *iconView = view;
-
-				//	Check if this is the icon that was deleted
-				SBIcon *icon = [iconView icon];
-				NSString *checkID = [icon applicationBundleID];
-				if (![checkID isEqualToString:bundleID]) {
-					continue;
-				}
-
-				//[Debug Log:[NSString stringWithFormat:@"Uninstalled: %@", bundleID]];
-
-				//	Get the icon's image
-				SBIconImageView *iconImage = [iconView _iconImageView];
-				UIImage *image = [iconImage displayedImage];
-				//UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
-
-				//	Position of the deleted icon
-				CGPoint pos = iconView.frame.origin;
-
-				//	Move point to center of icon
-				pos.x += iconView.frame.size.width / 2;
-				pos.y += iconView.frame.size.height / 2;
-
-				//[Debug Log:[NSString stringWithFormat:@"X:%f  Y:%f", pos.x, pos.y]];
-
-				//	Only bother figuring out colors if random colors is turned off
-				NSArray *colors = @[];
-				if (!randomColors)
-					colors = getColorsFromImage(image, colorCount);
-
-
-				//	Time to make particles
-				for (int i = 0; i < amount; i++) {
-					//	Add a bit of randomness to the position so that all points aren't stacked
-					CGPoint adjustedPos = pos;
-					adjustedPos.x += (1 - drand48() * 2);
-					adjustedPos.y += (1 - drand48() * 2);
-
-					ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:adjustedPos];
-
-					//	Figure out color for new particle
-					UIColor *color;
-					if (randomColors)
-						color = [UIColor colorWithRed:drand48() green:drand48() blue:drand48() alpha:1.0f];
-					else
-						color = colors[arc4random_uniform([colors count] - 1)];
-
-					newView.backgroundColor = color;
-					[self addSubview:newView];
-
-					//	Add behaviors to new view
-					[gravityBehavior addItem:newView];
-					[collisionBehavior addItem:newView];
-					[dynamicItemBehavior addItem:newView];
-
-					//	Push each particle in a random direction
-					UIPushBehavior *pushBehavior = [[UIPushBehavior alloc] initWithItems:@[newView] mode:UIPushBehaviorModeInstantaneous];
-					pushBehavior.angle = M_PI * 2 * drand48();
-					pushBehavior.magnitude = explosionForce * drand48();
-
-					newView.pushBehavior = pushBehavior;
-					[ExplosiveIcons_DynamicAnimator addBehavior:pushBehavior];
-				}
-
-				//	Add behaviors to DynamicAnimator
-
-				break;
+			//	Make sure the view is actually an icon. I think it always is anyway tho
+			if (![view isMemberOfClass:[%c(SBIconView) class]]) {
+				//	This prolly never happens
+				//[Debug Log:[NSString stringWithFormat:@"Not SBIconView :("]];
+				return;
 			}
+
+			SBIconView *iconView = view;
+
+			//	Check if this is the icon that was deleted
+			SBIcon *icon = [iconView icon];
+			NSString *checkID = [icon applicationBundleID];
+			if (![checkID isEqualToString:bundleID]) {
+				return;
+			}
+
+			//[Debug Log:[NSString stringWithFormat:@"Uninstalled: %@", bundleID]];
+
+			//	Get the icon's image
+			SBIconImageView *iconImage = [iconView _iconImageView];
+			UIImage *image = [iconImage displayedImage];
+			//UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+
+			//	Position of the deleted icon
+			CGPoint pos = iconView.frame.origin;
+
+			//	Move point to center of icon
+			pos.x += iconView.frame.size.width / 2;
+			pos.y += iconView.frame.size.height / 2;
+
+			//[Debug Log:[NSString stringWithFormat:@"X:%f  Y:%f", pos.x, pos.y]];
+
+			//	Only bother figuring out colors if random colors is turned off
+			NSArray *colors = @[];
+			if (!randomColors)
+				colors = getColorsFromImage(image, colorCount);
+
+
+			//	Time to make particles
+			for (int i = 0; i < amount; i++) {
+				//	Add a bit of randomness to the position so that all points aren't stacked
+				CGPoint adjustedPos = pos;
+				adjustedPos.x += (1 - drand48() * 2);
+				adjustedPos.y += (1 - drand48() * 2);
+
+				ExplosionParticleView *newView = [[ExplosionParticleView alloc] initAtPos:adjustedPos];
+
+				//	Figure out color for new particle
+				UIColor *color;
+				if (randomColors)
+					color = [UIColor colorWithRed:drand48() green:drand48() blue:drand48() alpha:1.0f];
+				else
+					color = colors[arc4random_uniform([colors count] - 1)];
+
+				newView.backgroundColor = color;
+				[self addSubview:newView];
+
+				//	Add behaviors to new view
+				[gravityBehavior addItem:newView];
+				[collisionBehavior addItem:newView];
+				[dynamicItemBehavior addItem:newView];
+
+				//	Push each particle in a random direction
+				UIPushBehavior *pushBehavior = [[UIPushBehavior alloc] initWithItems:@[newView] mode:UIPushBehaviorModeInstantaneous];
+				pushBehavior.angle = M_PI * 2 * drand48();
+				pushBehavior.magnitude = explosionForce * drand48();
+
+				newView.pushBehavior = pushBehavior;
+				[ExplosiveIcons_DynamicAnimator addBehavior:pushBehavior];
+			}
+
+
 		}
 	%end
 %end
