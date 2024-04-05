@@ -59,12 +59,10 @@
 }
 
 -(void)Reset {
-	[[[HBPreferences alloc] initWithIdentifier: @"com.wrp1002.explosiveicons"] removeAllObjects];
-
-	NSFileManager *fm = [NSFileManager defaultManager];
-	[fm removeItemAtPath: @"/var/mobile/Library/Preferences/com.wrp1002.explosiveicons.plist" error: nil];
-
-	[self Respring];
+	HBPreferences *prefs = [[HBPreferences alloc] initWithIdentifier:BUNDLE];
+	[prefs removeAllObjects];
+	[self reloadSpecifiers];
+	CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), CFSTR(BUNDLE_NOTIFY), nil, nil, true);
 }
 
 @end

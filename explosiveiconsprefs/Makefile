@@ -1,8 +1,15 @@
-TARGET := iphone:clang:latest:7.0
+#THEOS_PACKAGE_SCHEME=rootless
 
 include $(THEOS)/makefiles/common.mk
 
-ARCHS = arm64 arm64e
+ifeq ($(THEOS_PACKAGE_SCHEME),rootless)
+	ARCHS = arm64 arm64e
+	TARGET = iphone:clang:15.5:15.0
+else
+	ARCHS = armv7 armv7s arm64 arm64e
+	TARGET = iphone:clang:14.2:8.0
+endif
+
 SDKVERSION = 13.3
 
 BUNDLE_NAME = ExplosiveIconsPrefs
