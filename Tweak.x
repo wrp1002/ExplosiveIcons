@@ -118,6 +118,9 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
 			%orig;
 
+			if (!enabled)
+				return;
+
 			//[Debug Log:[NSString stringWithFormat:@"didRemoveIcon"]];
 
 			//	Get icon info and bundleID
@@ -138,30 +141,22 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 			//	If an icon is deleted, it's the only icon on screen, and editing mode isn't enabled,
 			//	then there's no point in doing the animation because the page instantly disapears
-			if ([subviews count] <= 1) {
-				BOOL editing = [self isEditing];
-
-				if (!editing)
-					return;
-			}
-
-			id view = [self iconViewForIcon:appIcon];
-			if (!view)
-				return;
-
-			//	Make sure the view is actually an icon. I think it always is anyway tho
-			if (![view isMemberOfClass:[%c(SBIconView) class]]) {
-				//	This prolly never happens
-				//[Debug Log:[NSString stringWithFormat:@"Not SBIconView :("]];
+			if ([subviews count] <= 1 && ![self isEditing]) {
+				//[Debug Log:[NSString stringWithFormat:@"not editing and no views. return"]];
 				return;
 			}
 
-			SBIconView *iconView = view;
+			SBIconView *iconView = [self iconViewForIcon:appIcon];
+			if (!iconView)
+				return;
+
+			//[Debug Log:[NSString stringWithFormat:@"view class:%@", [%c(SBIconView) class]]];
 
 			//	Check if this is the icon that was deleted
 			SBIcon *icon = [iconView icon];
 			NSString *checkID = [icon applicationBundleID];
 			if (![checkID isEqualToString:bundleID]) {
+				//[Debug Log:[NSString stringWithFormat:@"bundleID doesn't match"]];
 				return;
 			}
 
