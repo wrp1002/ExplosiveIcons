@@ -33,4 +33,6 @@
 @interface SBIconListView : UIView
 	@property (nonatomic, retain)UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
 	-(BOOL)isEditing;
+	-(id)iconViewForIcon:(id)arg1;
+	-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2;
 @end

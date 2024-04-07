@@ -107,12 +107,6 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 //	=========================== Hooks ===========================
 
-@interface SBIconListView (Override)
--(id)iconViewForIcon:(id)arg1;
--(void)iconList:(id)arg1 didRemoveIcon:(id)arg2;
-@end
-
-
 %group DelayedHooks
 	%hook SBIconListView
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
