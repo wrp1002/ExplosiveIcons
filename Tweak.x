@@ -1,32 +1,76 @@
 #import <UIKit/UIKit.h>
-#import <Cephei/HBPreferences.h>
 #import <objc/runtime.h>
 #include "Tweak.h"
-//#import "Debug.h"
 
 #define TWEAK_NAME @"ExplosiveIcons"
 #define BUNDLE [NSString stringWithFormat:@"com.wrp1002.%@", [TWEAK_NAME lowercaseString]]
+#define BUNDLE_NOTIFY (CFStringRef)[NSString stringWithFormat:@"%@/ReloadPrefs", BUNDLE]
+
+
+//	=========================== Other vars ===========================
+
+UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
+UIGravityBehavior *gravityBehavior;
+UICollisionBehavior *collisionBehavior;
+UIDynamicItemBehavior *dynamicItemBehavior;
 
 //	=========================== Preference vars ===========================
 
 BOOL enabled;
 BOOL gravity;
 BOOL randomColors;
-NSInteger colorCount = 30;
-NSInteger ballSize = 15;
-NSInteger amount = 100;
-CGFloat fadeTime = 1.5f;
-CGFloat bounce = 0.8;
-CGFloat explosionForce = 0.05;
+NSInteger colorCount;
+NSInteger ballSize;
+NSInteger amount;
+CGFloat fadeTime;
+CGFloat bounce;
+CGFloat explosionForce;
 
-//	=========================== Other vars ===========================
+NSUserDefaults *prefs = nil;
 
-HBPreferences *preferences;
+static void InitPrefs(void) {
+	if (!prefs) {
+		NSDictionary *defaultPrefs = @{
+			@"kEnabled": @YES,
+			@"kGravity": @YES,
+			@"kRandomColors": @NO,
+			@"kColorCount": @20,
+			@"kBallSize": @15,
+			@"kAmount": @100,
+			@"kFadeTime": @1.5f,
+			@"kBounce": @0.8f,
+			@"kExplosionForce": @0.05,
+		};
+		prefs = [[NSUserDefaults alloc] initWithSuiteName:BUNDLE];
+		[prefs registerDefaults:defaultPrefs];
+	}
+}
 
-UIDynamicAnimator *ExplosiveIcons_DynamicAnimator;
-UIGravityBehavior *gravityBehavior;
-UICollisionBehavior *collisionBehavior;
-UIDynamicItemBehavior *dynamicItemBehavior;
+static void UpdatePrefs() {
+	//[Debug Log:@"updateprsfs"];
+	enabled = [prefs boolForKey:@"kEnabled"];
+	gravity = [prefs boolForKey:@"kGravity"];
+	randomColors = [prefs boolForKey:@"kRandomColors"];
+
+	colorCount =[prefs integerForKey:@"kColorCount"];
+	ballSize =[prefs integerForKey:@"kBallSize"];
+	amount =[prefs integerForKey:@"kAmount"];
+
+	fadeTime = [prefs floatForKey:@"kFadeTime"];
+	bounce = [prefs floatForKey:@"kBounce"];
+	explosionForce = [prefs floatForKey:@"kExplosionForce"];
+
+	if (gravity)
+		gravityBehavior.gravityDirection = CGVectorMake(0, 5);
+	else
+		gravityBehavior.gravityDirection = CGVectorMake(0, 0);
+
+	dynamicItemBehavior.elasticity = bounce;
+}
+
+static void PrefsChangeCallback(CFNotificationCenterRef center, void *observer, CFNotificationName name, const void *object, CFDictionaryRef userInfo) {
+	UpdatePrefs();
+}
 
 //	=========================== Classes / Functions ===========================
 
@@ -107,7 +151,8 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 //	=========================== Hooks ===========================
 
-%group DelayedHooks
+
+%group iOS13AndUpHooks
 	%hook SBIconListView
 		-(void)iconList:(id)arg1 didRemoveIcon:(id)arg2 {
 			%orig;
@@ -117,7 +162,11 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 
 			//[Debug Log:[NSString stringWithFormat:@"didRemoveIcon"]];
 
-			//	Get icon info and bundleID
+			if (![arg2 isKindOfClass:[%c(SBApplicationIcon) class]]) {
+				//[Debug Log:[NSString stringWithFormat:@"Not SBApplicationIcon"]];
+				return;
+			}
+
 			SBApplicationIcon *appIcon = arg2;
 			SBApplication *app = [appIcon application];
 			NSString *bundleID = [app bundleIdentifier];
@@ -144,7 +193,7 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 			if (!iconView)
 				return;
 
-			//[Debug Log:[NSString stringWithFormat:@"view class:%@", [%c(SBIconView) class]]];
+			//[Debug Log:[NSString stringWithFormat:@"view class:%@", [iconView class]]];
 
 			//	Check if this is the icon that was deleted
 			SBIcon *icon = [iconView icon];
@@ -157,8 +206,136 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 			//[Debug Log:[NSString stringWithFormat:@"Uninstalled: %@", bundleID]];
 
 			//	Get the icon's image
-			SBIconImageView *iconImage = [iconView _iconImageView];
-			UIImage *image = [iconImage displayedImage];
+			SBIconImageView *iconImageView = [iconView _iconImageView];
+			UIImage *image = [iconImageView displayedImage];
+
+			[self explodeIcon:iconView image:image];
+
+		}
+	%end
+%end
+
+%group iOS12AndBelowHooks
+	%hook SBIconListView
+		-(void)removeIconAtIndex:(unsigned long long)arg1 {
+			if (!enabled) {
+				%orig;
+				return;
+			}
+
+			//[Debug Log:[NSString stringWithFormat:@"removeIconAtIndex: %llu", arg1]];
+
+			id appIconId = [[self icons] objectAtIndex:arg1];
+
+			//[Debug Log:[NSString stringWithFormat:@"appicon: %@", appIconId]];
+
+			if (![appIconId isKindOfClass:[%c(SBApplicationIcon) class]]) {
+				//[Debug Log:[NSString stringWithFormat:@"Not SBApplicationIcon"]];
+				%orig;
+				return;
+			}
+
+			SBApplicationIcon *appIcon = appIconId;
+			//[Debug Log:[NSString stringWithFormat:@"icon:%@", appIcon]];
+
+			SBApplication *app = [appIcon application];
+			NSString *bundleID = [app bundleIdentifier];
+
+			//	bundleID is null if the icon is being moved, which is great
+			if (!bundleID) {
+				//[Debug Log:[NSString stringWithFormat:@"No bundle ID"]];
+				%orig;
+				return;
+			}
+
+			//[Debug Log:[NSString stringWithFormat:@"bundleID:%@", bundleID]];
+
+			// Get the subviews of the SBIconListView (all icons on screen)
+			NSArray *subviews = [self subviews];
+
+			//	If an icon is deleted, it's the only icon on screen, and editing mode isn't enabled,
+			//	then there's no point in doing the animation because the page instantly disapears
+			if ([subviews count] <= 1 && ![self isEditing]) {
+				//[Debug Log:[NSString stringWithFormat:@"not editing and no views. return"]];
+				%orig;
+				return;
+			}
+
+			SBIconViewMap *iconViewMap = [self viewMap];
+
+			SBIconView *iconView = [iconViewMap iconViewForIcon:appIcon];
+			if (!iconView) {
+				%orig;
+				return;
+			}
+
+			//[Debug Log:[NSString stringWithFormat:@"view class:%@", [iconView class]]];
+
+			//	Check if this is the icon that was deleted
+			SBIcon *icon = [iconView icon];
+			NSString *checkID = [icon applicationBundleID];
+			if (![checkID isEqualToString:bundleID]) {
+				//[Debug Log:[NSString stringWithFormat:@"bundleID doesn't match"]];
+				%orig;
+				return;
+			}
+
+			//	Get the icon's image
+			SBIconImageView *iconImageView = [iconView _iconImageView];
+			UIImage *image = [iconImageView snapshot];
+
+			//[Debug Log:[NSString stringWithFormat:@"Uninstalled: %@", bundleID]];
+			[self explodeIcon:iconView image:image];
+
+			%orig;
+		}
+	%end
+%end
+
+
+%group AllVersionHooks
+	%hook SpringBoard
+		//	Called when springboard is finished launching
+		-(void)applicationDidFinishLaunching:(id)application {
+			%orig;
+			//[Debug SpringBoardReady];
+
+			//	Lots of icons are added and removed as SpringBoard starts up, so wait till its finished to init SBIconListView hooks
+			if (@available(iOS 13.0, *))
+				%init(iOS13AndUpHooks);
+			else
+				%init(iOS12AndBelowHooks);
+
+
+			// Setup physics animators
+			ExplosiveIcons_DynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:[UIScreen mainScreen]];
+
+			gravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[]];
+			if (gravity)
+				gravityBehavior.gravityDirection = CGVectorMake(0, 5);
+			else
+				gravityBehavior.gravityDirection = CGVectorMake(0, 0);
+
+			collisionBehavior = [[UICollisionBehavior alloc] initWithItems:@[]];
+			collisionBehavior.translatesReferenceBoundsIntoBoundary = YES;
+			collisionBehavior.collisionMode = UICollisionBehaviorModeEverything;
+
+			dynamicItemBehavior = [[UIDynamicItemBehavior alloc] initWithItems:@[]];
+			dynamicItemBehavior.elasticity = bounce;
+
+			[ExplosiveIcons_DynamicAnimator addBehavior:gravityBehavior];
+			[ExplosiveIcons_DynamicAnimator addBehavior:collisionBehavior];
+			[ExplosiveIcons_DynamicAnimator addBehavior:dynamicItemBehavior];
+		}
+
+	%end
+
+	%hook SBIconListView
+		%new
+		-(void)explodeIcon:(id)arg1 image:(id)arg2 {
+			SBIconView *iconView = arg1;
+			UIImage *image = arg2;
+
 			//UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
 
 			//	Position of the deleted icon
@@ -174,7 +351,6 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 			NSArray *colors = @[];
 			if (!randomColors)
 				colors = getColorsFromImage(image, colorCount);
-
 
 			//	Time to make particles
 			for (int i = 0; i < amount; i++) {
@@ -208,83 +384,31 @@ NSArray* getColorsFromImage(UIImage* image, int count) {
 				newView.pushBehavior = pushBehavior;
 				[ExplosiveIcons_DynamicAnimator addBehavior:pushBehavior];
 			}
-
-
 		}
-	%end
-%end
-
-%group Hooks
-	%hook SpringBoard
-		//	Called when springboard is finished launching
-		-(void)applicationDidFinishLaunching:(id)application {
-			%orig;
-			//[Debug SpringBoardReady];
-
-			//	Lots of icons are added and removed as SpringBoard starts up, so wait till its finished to init SBIconListView hooks
-			%init(DelayedHooks);
-
-
-			ExplosiveIcons_DynamicAnimator = [[UIDynamicAnimator alloc] initWithReferenceView:[UIScreen mainScreen]];
-
-			gravityBehavior = [[UIGravityBehavior alloc] initWithItems:@[]];
-			if (gravity)
-				gravityBehavior.gravityDirection = CGVectorMake(0, 5);
-			else
-				gravityBehavior.gravityDirection = CGVectorMake(0, 0);
-
-			collisionBehavior = [[UICollisionBehavior alloc] initWithItems:@[]];
-			collisionBehavior.translatesReferenceBoundsIntoBoundary = YES;
-			collisionBehavior.collisionMode = UICollisionBehaviorModeEverything;
-
-			dynamicItemBehavior = [[UIDynamicItemBehavior alloc] initWithItems:@[]];
-			dynamicItemBehavior.elasticity = bounce;
-
-			[ExplosiveIcons_DynamicAnimator addBehavior:gravityBehavior];
-			[ExplosiveIcons_DynamicAnimator addBehavior:collisionBehavior];
-			[ExplosiveIcons_DynamicAnimator addBehavior:dynamicItemBehavior];
-		}
-
 	%end
 %end
 
 
 //	=========================== Constructor stuff ===========================
 
-static void PrefsDidUpdate() {
-	if (gravity)
-		gravityBehavior.gravityDirection = CGVectorMake(0, 5);
-	else
-		gravityBehavior.gravityDirection = CGVectorMake(0, 0);
-
-	dynamicItemBehavior.elasticity = bounce;
-}
-
 %ctor {
 	srand48(time(0));
 
 	//[Debug Log:[NSString stringWithFormat:@"============== %@ started ==============", TWEAK_NAME]];
 
-	preferences = [[HBPreferences alloc] initWithIdentifier:BUNDLE];
+	InitPrefs();
+	UpdatePrefs();
 
-	[preferences registerBool:&enabled default:true forKey:@"kEnabled"];
-	[preferences registerBool:&gravity default:true forKey:@"kGravity"];
-	[preferences registerBool:&randomColors default:false forKey:@"kRandomColors"];
+	CFNotificationCenterAddObserver(
+		CFNotificationCenterGetDarwinNotifyCenter(),
+		NULL,
+		&PrefsChangeCallback,
+		BUNDLE_NOTIFY,
+		NULL,
+		0
+	);
 
-	[preferences registerInteger:&colorCount default:20 forKey:@"kColorCount"];
-	[preferences registerInteger:&ballSize default:15 forKey:@"kBallSize"];
-	[preferences registerInteger:&amount default:100 forKey:@"kAmount"];
-
-	[preferences registerFloat:&fadeTime default:1.5f forKey:@"kFadeTime"];
-	[preferences registerFloat:&bounce default:0.8f forKey:@"kBounce"];
-	[preferences registerFloat:&explosionForce default:0.05 forKey:@"kExplosionForce"];
-
-
-	[preferences registerPreferenceChangeBlock:^{
-		PrefsDidUpdate();
-	}];
-
-	%init(Hooks);
+	%init(AllVersionHooks);
 }
 
 

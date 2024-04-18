@@ -232,6 +232,8 @@
 	<dict>
 		<key>cell</key>
 		<string>PSGroupCell</string>
+		<key>footerText</key>
+		<string>Respringing is NOT needed for changes to take effect</string>
 	</dict>
 	<dict>
 		<key>cell</key>
@@ -245,9 +247,28 @@
 			<key>confirmation</key>
 			<dict>
 				<key>prompt</key>
-				<string>Are you sure? This will respring your device.</string>
+				<string>Are you sure you want to reset your settings?</string>
 				<key>title</key>
 				<string>Reset!</string>
+				<key>cancelTitle</key>
+				<string>Cancel</string>
+			</dict>
+	</dict>
+	<dict>
+		<key>cell</key>
+			<string>PSButtonCell</string>
+			<key>label</key>
+			<string>Respring</string>
+			<key>action</key>
+			<string>Respring</string>
+			<key>isDestructive</key>
+			<true/>
+			<key>confirmation</key>
+			<dict>
+				<key>prompt</key>
+				<string>Are you sure you want to respring your device?</string>
+				<key>title</key>
+				<string>Respring!</string>
 				<key>cancelTitle</key>
 				<string>Cancel</string>
 			</dict>
